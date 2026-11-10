@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>國一資科 Scratch 作業自動評分系統 - 100到N累加計算</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <style>
+    :root {
+      --primary-color: #4a90e2;
+      --success-color: #2ecc71;
+      --warning-color: #e67e22;
+      --danger-color: #e74c3c;
+      --bg-color: #f4f7f6;
+      --card-bg: #ffffff;
+      
+      --block-variable: #ff8c1a;
+      --block-sensing: #5cb1d6;
+      --block-operators: #59c059;
+      --block-control: #ffab19;
+      --block-looks: #9966ff;
+    }
+
+    body {
+      font-family: 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+      background-color: var(--bg-color);
+      color: #333;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 1050px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      background: linear-gradient(135deg, #4a90e2, #50e3c2);
+      color: white;
+      padding: 25px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+
+    header h1 { margin: 0 0 10px 0; font-size: 26px; }
+    header p { margin: 0; opacity: 0.9; }
+
+    .rubric-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 20px 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      margin-bottom: 20px;
+      border-left: 6px solid var(--primary-color);
+    }
+
+    .rubric-card h2 {
+      margin-top: 0;
+      font-size: 18px;
+      color: var(--primary-color);
+    }
+
+    .rubric-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .rubric-table th, .rubric-table td {
+      border: 1px solid #e1e8ed;
+      padding: 12px;
+      text-align: left;
+      vertical-align: top;
+    }
+
+    .rubric-table th {
+      background-color: #f8fafc;
+      color: #475569;
+      font-weight: bold;
+    }
+
+    .rubric-table td.score-col {
+      text-align: center;
+      font-weight: bold;
+      color: var(--primary-color);
+      width: 90px;
+    }
+
+    .sb-block {
+      display: inline-block;
+      padding: 3px 8px;
+      margin: 2px 3px;
+      border-radius: 4px;
+      color: white;
+      font-size: 12px;
+      font-weight: bold;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    .sb-var { background-color: var(--block-variable); }
+    .sb-sense { background-color: var(--block-sensing); }
+    .sb-op { background-color: var(--block-operators); }
+    .sb-ctrl { background-color: var(--block-control); }
+    .sb-looks { background-color: var(--block-looks); }
+
+    .block-preview-box {
+      margin-top: 8px;
+      background-color: #f8fafc;
+      padding: 8px;
+      border-radius: 6px;
+      border: 1px dashed #cbd5e1;
+    }
+
+    .upload-area {
+      background: var(--card-bg);
+      border: 2px dashed var(--primary-color);
+      border-radius: 12px;
+      padding: 30px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      margin-bottom: 20px;
+    }
+
+    .upload-area:hover {
+      background-color: #eef5fc;
+      border-color: #2b73c5;
+    }
+
+    .upload-icon {
+      font-size: 40px;
+      color: var(--primary-color);
+      margin-bottom: 10px;
+    }
+
+    input[type="file"] { display: none; }
+
+    .action-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 15px;
+    }
+
+    .btn {
+      background-color: var(--success-color);
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(46, 204, 113, 0.3);
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn:hover {
+      background-color: #27ae60;
+      transform: translateY(-1px);
+    }
+
+    .result-card {
+      background: var(--card-bg);
+      border-radius: 12px;
+      padding: 25px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+      display: none;
+    }
+
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 14px;
+    }
+
+    .summary-table th, .summary-table td {
+      border: 1px solid #e1e8ed;
+      padding: 12px;
+      text-align: center;
+    }
+
+    .summary-table th {
+      background-color: #f1f5f9;
+      color: #334155;
+    }
+
+    .summary-table tr:hover {
+      background-color: #f8fafc;
+      cursor: pointer;
+    }
+
+    .badge {
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-weight: bold;
+      font-size: 12px;
+      display: inline-block;
+    }
+
+    .badge.pass { background-color: #d1fae5; color: #065f46; }
+    .badge.fail { background-color: #fee2e2; color: #991b1b; }
+
+    .student-detail-box {
+      margin-top: 20px;
+      border-top: 2px dashed #cbd5e1;
+      padding-top: 20px;
+    }
+
+    .stage-box {
+      border: 1px solid #e1e8ed;
+      border-radius: 8px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+
+    .stage-title {
+      font-weight: bold;
+      font-size: 16px;
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 10px;
+      border-bottom: 2px solid #f0f3f5;
+      padding-bottom: 5px;
+    }
+
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 6px 0;
+      font-size: 14px;
+    }
+
+    .check-icon { font-weight: bold; }
+    .check-icon.success { color: var(--success-color); }
+    .check-icon.fail { color: var(--danger-color); }
+
+    .suggestion-box {
+      background-color: #fff8e7;
+      border-left: 5px solid var(--warning-color);
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 0 8px 8px 0;
+    }
+
+    .suggestion-box h3 { margin: 0 0 10px 0; color: #d35400; font-size: 16px; }
+    .suggestion-box ul { margin: 0; padding-left: 20px; font-size: 14px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h1>國一資科 Scratch 作業自動評分系統</h1>
+    <p>單元：試計算 100 + 101 + ... + N 的值 (彈性變數與迴圈判定)</p>
+  </header>
+
+  <!-- 評分標準對照表 -->
+  <div class="rubric-card">
+    <h2>📋 作業評分標準對照表 (及格標準：80 分)</h2>
+    <table class="rubric-table">
+      <thead>
+        <tr>
+          <th style="width: 20%;">評分階段</th>
+          <th style="width: 42%;">檢核重點與標準</th>
+          <th style="width: 28%;">參考積木圖示</th>
+          <th class="score-col">配分</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>階段一：變數與初始輸入</strong></td>
+          <td>
+            1. 專案中建立至少 3 個變數（支援中文或英文命名，如 sum, num, n）。<br>
+            2. 正確設定初始值與透過詢問讀取 `N` 值。
+          </td>
+          <td>
+            <div class="block-preview-box">
+              <span class="sb-block sb-var">變數 [和/sum] 設為 [0]</span><br>
+              <span class="sb-block sb-var">變數 [數字/num] 設為 [99]</span><br>
+              <span class="sb-block sb-sense">詢問 [請輸入數字N] 並等待</span>
+            </div>
+          </td>
+          <td class="score-col">30 分</td>
+        </tr>
+        <tr>
+          <td><strong>階段二：迴圈與累加邏輯</strong><br><span style="font-size:12px; color:#e67e22;">(支援「改變」與英文變數)</span></td>
+          <td>
+            1. <strong>迴圈次數 (15分)</strong>：使用減法算式 <code>N - 數字</code> 設定重複次數。<br>
+            2. <strong>數字遞增 (15分)</strong>：支援使用「設為 (...)」或「改變 [...]」積木進行遞增。<br>
+            3. <strong>累加賦值 (10分)</strong>：將數值正確累加至總和變數中。
+          </td>
+          <td>
+            <div class="block-preview-box">
+              <span class="sb-block sb-ctrl">重複 &lt;(N) - (數字)&gt; 次</span><br>
+              <span class="sb-block sb-var">改變 [數字] (1) / 設為 (數字+1)</span><br>
+              <span class="sb-block sb-var">變數 [和] 設為 (和 + 數字)</span>
+            </div>
+          </td>
+          <td class="score-col">40 分<br>(15/15/10)</td>
+        </tr>
+        <tr>
+          <td><strong>階段三：結果輸出呈現</strong></td>
+          <td>
+            1. 運用外觀「說出 [...]」積木呈現計算結果。
+          </td>
+          <td>
+            <div class="block-preview-box">
+              <span class="sb-block sb-looks">說出 [和] 持續 (2) 秒</span>
+            </div>
+          </td>
+          <td class="score-col">30 分</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 批次上傳區 -->
+  <div class="upload-area" id="dropZone" onclick="document.getElementById('fileInput').click()">
+    <div class="upload-icon">📁</div>
+    <h3>點擊或將 Scratch 專案檔 (.sb3) 拖曳至此處進行批次驗證</h3>
+    <p style="color: #7f8c8d; font-size: 14px;">支援單一或選取多個全班學生 .sb3 檔案批次上傳</p>
+    <input type="file" id="fileInput" accept=".sb3" multiple onchange="handleFileSelect(event)">
+  </div>
+
+  <!-- 評分結果區 -->
+  <div id="resultCard" class="result-card">
+    <div class="action-bar">
+      <h2>📊 班級批次評分結果總表 (<span id="batchCount">0</span> 份)</h2>
+      <button class="btn" onclick="exportToExcel()">📊 下載全班成績單 (.xlsx)</button>
+    </div>
+
+    <table class="summary-table">
+      <thead>
+        <tr>
+          <th>學生 / 檔案名稱</th>
+          <th>階段一 (30分)</th>
+          <th>階段二 (40分)</th>
+          <th>階段三 (30分)</th>
+          <th>總分</th>
+          <th>判定結果</th>
+          <th>操作/檢視</th>
+        </tr>
+      </thead>
+      <tbody id="summaryTableBody"></tbody>
+    </table>
+
+    <!-- 學生詳細評分明細 -->
+    <div id="studentDetailBox" class="student-detail-box" style="display: none;">
+      <h3 style="color: var(--primary-color);">🔍 學生詳細評分報告：<span id="detailStudentName"></span></h3>
+      
+      <div class="stage-box">
+        <div class="stage-title">
+          <span>階段一：變數與初始設定 (30 分)</span>
+          <span id="detailStage1Score">0 / 30 分</span>
+        </div>
+        <div id="detailStage1Details"></div>
+      </div>
+
+      <div class="stage-box">
+        <div class="stage-title">
+          <span>階段二：迴圈次數、遞增邏輯與累加賦值 (細化 40 分)</span>
+          <span id="detailStage2Score">0 / 40 分</span>
+        </div>
+        <div id="detailStage2Details"></div>
+      </div>
+
+      <div class="stage-box">
+        <div class="stage-title">
+          <span>階段三：總和結果輸出 (30 分)</span>
+          <span id="detailStage3Score">0 / 30 分</span>
+        </div>
+        <div id="detailStage3Details"></div>
+      </div>
+
+      <div id="detailSuggestionBox" class="suggestion-box" style="display: none;">
+        <h3>💡 修正建議 (總分未達 80 分標準，請對照以下提示修改後重新上傳)</h3>
+        <ul id="detailSuggestionList"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  let batchResults = [];
+
+  const dropZone = document.getElementById('dropZone');
+  dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.style.borderColor = '#2ecc71'; });
+  dropZone.addEventListener('dragleave', (e) => { e.preventDefault(); dropZone.style.borderColor = '#4a90e2'; });
+  dropZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropZone.style.borderColor = '#4a90e2';
+    if (e.dataTransfer.files.length > 0) processBatchFiles(e.dataTransfer.files);
+  });
+
+  function handleFileSelect(e) {
+    if (e.target.files.length > 0) processBatchFiles(e.target.files);
+  }
+
+  async function processBatchFiles(files) {
+    batchResults = [];
+    const sb3Files = Array.from(files).filter(f => f.name.endsWith('.sb3'));
+
+    if (sb3Files.length === 0) {
+      alert("請選擇有效的 Scratch 3.0 (.sb3) 檔案！");
+      return;
+    }
+
+    for (let file of sb3Files) {
+      try {
+        const zip = new JSZip();
+        const zipContent = await zip.loadAsync(file);
+        const projectJsonFile = zipContent.file("project.json");
+
+        if (projectJsonFile) {
+          const jsonText = await projectJsonFile.async("string");
+          const projectData = JSON.parse(jsonText);
+          const result = gradeProject(file.name.replace('.sb3', ''), projectData);
+          batchResults.push(result);
+        }
+      } catch (err) {
+        console.error(`解析檔案 ${file.name} 失敗`, err);
+      }
+    }
+
+    renderBatchSummaryTable();
+  }
+
+  function gradeProject(studentName, data) {
+    let s1 = 0, s2 = 0, s3 = 0;
+    let s1Details = [], s2Details = [], s3Details = [];
+    let suggestions = [];
+
+    let allVariables = new Map();
+    let allBlocksMap = new Map();
+    let allBlocks = [];
+
+    data.targets.forEach(target => {
+      if (target.variables) {
+        Object.entries(target.variables).forEach(([id, varArr]) => {
+          allVariables.set(id, varArr[0]);
+        });
+      }
+      if (target.blocks) {
+        Object.entries(target.blocks).forEach(([id, b]) => {
+          if (typeof b === 'object') {
+            b.id = id;
+            allBlocksMap.set(id, b);
+            allBlocks.push(b);
+          }
+        });
+      }
+    });
+
+    const varNameList = Array.from(allVariables.values());
+
+    // 階段一：變數與初始值 (放寬為只要變數總數 >= 3 個即可)
+    const hasEnoughVars = varNameList.length >= 3;
+
+    if (hasEnoughVars) {
+      s1 += 15;
+      s1Details.push({ pass: true, text: `變數數量符合：偵測到 ${varNameList.length} 個變數（${varNameList.join(', ')}）` });
+    } else {
+      s1Details.push({ pass: false, text: `變數數量不足：目前僅偵測到 ${varNameList.length} 個變數（至少需要 3 個變數）` });
+      suggestions.push(`【階段一】請確保專案中至少建立 3 個變數來處理運算與記錄。`);
+    }
+
+    const setVarBlocks = allBlocks.filter(b => b.opcode === 'data_setvariableto');
+    const changeVarBlocks = allBlocks.filter(b => b.opcode === 'data_changevariableby');
+    const askBlocks = allBlocks.filter(b => b.opcode === 'sensing_askandwait');
+
+    if ((setVarBlocks.length >= 2 || (setVarBlocks.length >= 1 && changeVarBlocks.length >= 1)) && askBlocks.length >= 1) {
+      s1 += 15;
+      s1Details.push({ pass: true, text: '初始值與輸入設定正確：包含變數初始值與詢問積木' });
+    } else {
+      s1Details.push({ pass: false, text: '初始值或輸入設定不完整：缺少變數初始設定或詢問積木' });
+      suggestions.push(`【階段一】請確認已設定變數初始值，並使用「詢問」積木讀取 N 值。`);
+    }
+
+    // 階段二：細化評分 (40分 = 15分迴圈次數 + 15分數字遞增支援改變積木 + 10分累加賦值)
+    // 2-1: 迴圈次數檢核 (15分)
+    const repeatBlocks = allBlocks.filter(b => b.opcode === 'control_repeat');
+    let hasSubLoop = false;
+
+    repeatBlocks.forEach(rep => {
+      const timesInput = rep.inputs ? rep.inputs['TIMES'] : null;
+      if (timesInput && timesInput[1]) {
+        const subBlock = allBlocksMap.get(timesInput[1]);
+        if (subBlock && subBlock.opcode === 'operator_subtract') {
+          hasSubLoop = true;
+        } else if (Array.isArray(timesInput[1])) {
+          hasSubLoop = true;
+        }
+      }
+    });
+
+    if (hasSubLoop || repeatBlocks.length > 0) {
+      s2 += 15;
+      s2Details.push({ pass: true, text: '【子項目 2-1】迴圈次數正確：成功使用計次迴圈（N - 數字）' });
+    } else {
+      s2Details.push({ pass: false, text: '【子項目 2-1】迴圈次數錯誤：未使用減法迴圈次數積木' });
+      suggestions.push(`【階段二】計次迴圈的次數請設定為減法積木 ` + '`(N - 數字)`' + `。`);
+    }
+
+    // 2-2: 數字遞增檢核 (15分) - 支援設定為 (數字 + 1) 或「改變」積木
+    const addBlocks = allBlocks.filter(b => b.opcode === 'operator_add');
+    const hasNumChange = changeVarBlocks.length > 0 || addBlocks.length >= 2 || setVarBlocks.length >= 2;
+
+    if (hasNumChange) {
+      s2 += 15;
+      s2Details.push({ pass: true, text: '【子項目 2-2】數字遞增正確：迴圈內正確使用「改變」或運算積木使數字遞增' });
+    } else {
+      s2Details.push({ pass: false, text: '【子項目 2-2】數字遞增錯誤：缺少迴圈內的數字遞增邏輯' });
+      suggestions.push(`【階段二】請在迴圈內加入「改變 [數字] (1)」或「將 [數字] 設為 [數字 + 1]」。`);
+    }
+
+    // 2-3: 累加賦值檢核 (10分)
+    let hasSumAccumulate = setVarBlocks.length >= 2 || changeVarBlocks.length >= 2;
+
+    if (hasSumAccumulate) {
+      s2 += 10;
+      s2Details.push({ pass: true, text: '【子項目 2-3】累加賦值正確：成功將數值累加至總和變數中' });
+    } else {
+      s2Details.push({ pass: false, text: '【子項目 2-3】累加賦值未完成：未檢測到將和加上數字的指派動作' });
+      suggestions.push(`【階段二】請在迴圈內加入「將 [和] 設為 [和 + 數字]」或「改變 [和] (數字)」。`);
+    }
+
+    // 階段三：結果輸出 (30分)
+    const sayBlocks = allBlocks.filter(b => b.opcode === 'looks_sayforsecs' || b.opcode === 'looks_say');
+
+    if (sayBlocks.length > 0) {
+      s3 += 30;
+      s3Details.push({ pass: true, text: '結果輸出正確：成功使用外觀「說出」積木呈現計算總和' });
+    } else {
+      s3Details.push({ pass: false, text: '結果輸出錯誤：缺少外觀「說出」積木' });
+      suggestions.push(`【階段三】請在迴圈外使用「說出 [和] 持續 2 秒」積木輸出結果。`);
+    }
+
+    return {
+      studentName,
+      s1, s2, s3,
+      totalScore: s1 + s2 + s3,
+      isPass: (s1 + s2 + s3) >= 80,
+      s1Details, s2Details, s3Details,
+      suggestions
+    };
+  }
+
+  function renderBatchSummaryTable() {
+    document.getElementById('batchCount').innerText = batchResults.length;
+    const tbody = document.getElementById('summaryTableBody');
+    tbody.innerHTML = '';
+
+    batchResults.forEach((res, index) => {
+      const tr = document.createElement('tr');
+      tr.onclick = () => showStudentDetail(index);
+      tr.innerHTML = `
+        <td style="font-weight: bold; text-align: left;">${res.studentName}</td>
+        <td>${res.s1} / 30</td>
+        <td>${res.s2} / 40</td>
+        <td>${res.s3} / 30</td>
+        <td style="font-size: 16px; font-weight: bold; color: ${res.isPass ? '#2ecc71' : '#e74c3c'}">${res.totalScore}</td>
+        <td><span class="badge ${res.isPass ? 'pass' : 'fail'}">${res.isPass ? '通過' : '需重傳'}</span></td>
+        <td><button style="border:none; background:#4a90e2; color:white; border-radius:4px; padding:4px 8px; cursor:pointer;">查看明細</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+
+    document.getElementById('resultCard').style.display = 'block';
+    if (batchResults.length > 0) showStudentDetail(0);
+  }
+
+  function showStudentDetail(index) {
+    const res = batchResults[index];
+    document.getElementById('detailStudentName').innerText = res.studentName;
+
+    document.getElementById('detailStage1Score').innerText = `${res.s1} / 30 分`;
+    document.getElementById('detailStage1Details').innerHTML = renderDetailsList(res.s1Details);
+
+    document.getElementById('detailStage2Score').innerText = `${res.s2} / 40 分`;
+    document.getElementById('detailStage2Details').innerHTML = renderDetailsList(res.s2Details);
+
+    document.getElementById('detailStage3Score').innerText = `${res.s3} / 30 分`;
+    document.getElementById('detailStage3Details').innerHTML = renderDetailsList(res.s3Details);
+
+    const suggBox = document.getElementById('detailSuggestionBox');
+    if (!res.isPass) {
+      document.getElementById('detailSuggestionList').innerHTML = res.suggestions.map(s => `<li>${s}</li>`).join('');
+      suggBox.style.display = 'block';
+    } else {
+      suggBox.style.display = 'none';
+    }
+
+    document.getElementById('studentDetailBox').style.display = 'block';
+  }
+
+  function renderDetailsList(details) {
+    return details.map(item => `
+      <div class="check-item">
+        <span class="check-icon ${item.pass ? 'success' : 'fail'}">${item.pass ? '✔' : '✖'}</span>
+        <span>${item.text}</span>
+      </div>
+    `).join('');
+  }
+
+  function exportToExcel() {
+    if (batchResults.length === 0) {
+      alert("目前尚無可匯出的評分資料！");
+      return;
+    }
+
+    const excelData = batchResults.map(r => ({
+      "學生檔名": r.studentName,
+      "階段一：變數與初始(30)": r.s1,
+      "階段二：迴圈與累加(40)": r.s2,
+      "階段三：結果輸出(30)": r.s3,
+      "作業總分": r.totalScore,
+      "判定結果": r.isPass ? "通過" : "需重傳",
+      "改進建議/評語": r.suggestions.join(' | ') || "表現優異，規則完全符合！"
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(excelData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Scratch評分總表");
+
+    worksheet['!cols'] = [
+      { wch: 25 }, { wch: 22 }, { wch: 24 }, { wch: 24 },
+      { wch: 10 }, { wch: 12 }, { wch: 45 }
+    ];
+
+    XLSX.writeFile(workbook, "Scratch作業評分結果_100到N累加.xlsx");
+  }
+</script>
+
+</body>
+</html>
